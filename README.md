@@ -77,12 +77,11 @@ Ensure you have **Python 3.8+** installed on your system. You will need the foll
 The application creates a configuration file named `FinExtract_Settings.json` in your user home directory (e.g., `C:\Users\Name\` or `/Users/Name/`).
 
 -   **Themes**: Stores your preferred appearance mode (System/Dark/Light) and color theme.
--   **Bank Configs**: Advanced users can modify this JSON to customize Excel column visibility, labels, and widths for specific banks (handled via `utils.py`).
 
 ## 📂 Project Structure
 
 -   `main.py`: The entry point of the application. Contains the GUI logic and thread management.
--   `utils.py`: Utility functions for loading configurations and saving styled Excel files.
+-   `#utils.py`: Utility functions for loading configurations and saving styled Excel files. (drafted for another version)
 -   `BNI.py`: Extraction logic specific to BNI statements.
 -   `Mandiri.py`: Extraction logic specific to Mandiri statements.
 -   `Livin.py`: Extraction logic for Livin' by Mandiri app exports.
@@ -95,7 +94,7 @@ This tool is intended for personal productivity and data organization purposes.
 -   **Accuracy**: While every effort has been made to ensure accurate extraction, PDF formats can change. Always verify the output Excel against the original PDF.
 -   **Security**: Passwords entered in the application are used solely in memory for decryption during the runtime session and are never stored or transmitted.
 
-## 👤 Author
+## Author
 
 **Michael Aristyo R.**
 *FinExtract v1.0.8*
