@@ -12,8 +12,17 @@ from tkinter import filedialog, messagebox
 
 try:
     import customtkinter as ctk
-except Exception:
+except ImportError:
     raise RuntimeError("customtkinter tidak terpasang. Jalankan: pip install customtkinter")
+
+if sys.platform == "darwin":
+    try:
+        _original_ctk_font_init = ctk.CTkFont.__init__
+        def _new_ctk_font_init(self, family=None, *args, **kwargs):
+            if family is None: family = "SF Pro Display"
+            _original_ctk_font_init(self, family, *args, **kwargs)
+        ctk.CTkFont.__init__ = _new_ctk_font_init
+    except Exception: pass
 
 try:
     from pypdf import PdfReader, PdfWriter
@@ -44,7 +53,7 @@ THEME_CONFIG = {
         "border": ("#F48FB1", "#880E4F"),            
         "entry_bg": ("#FFF8FA", "#28181D"),          
         "log_info": ("#880E4F", "#F8BBD0")           
-    }
+    },
 }
 
 class SettingsDialog(ctk.CTkToplevel):
@@ -196,6 +205,15 @@ class BankGUI(ctk.CTk):
         self.gui_queue = queue.Queue()
         self.after(100, self.process_gui_queue)
 
+        # Daftar modul untuk Auto-Detect
+        self.AUTO_BANKS = [
+            ('BNI', 'extract_bni_data', ['BANK NEGARA INDONESIA', 'BNIDIRECT']),
+            ('Mandiri', 'process_bank_statement', ['BANK MANDIRI', 'MANDIRI', 'ACCOUNT STATEMENT']),
+            ('Livin', 'process_livin_statement', ['LIVIN BY MANDIRI']),
+            ('OCBC', 'process_ocbc_final', ['OCBC NISP', 'BANK OCBC', 'OCBC']),
+            ('BRI', 'extract_bri_text', ['BANK RAKYAT INDONESIA', 'BRIDIRECT', 'IBBIZ', 'IBIZ', 'BRI'])
+        ]
+
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -217,6 +235,8 @@ class BankGUI(ctk.CTk):
         self.btn_ocbc.grid(row=3, column=0, padx=20, pady=10)
         self.btn_bri = ctk.CTkButton(self.sidebar, text="BRI", command=lambda: self.start_task('BRI', 'extract_bri_text'))
         self.btn_bri.grid(row=4, column=0, padx=20, pady=10)
+        self.btn_auto = ctk.CTkButton(self.sidebar, text="✨ Auto Detect Bank", fg_color="#27ae60", hover_color="#219150", command=lambda: self.start_task('AUTO', ''))
+        self.btn_auto.grid(row=6, column=0, padx=20, pady=(20, 10))
 
 
         # Settings Button
@@ -286,7 +306,7 @@ class BankGUI(ctk.CTk):
         # Collections
         self.all_buttons = [
             self.btn_bni, self.btn_mandiri, self.btn_ocbc, self.btn_bri, self.btn_livin,
-            self.btn_settings, 
+            self.btn_auto, self.btn_settings, 
             self.btn_in, self.btn_out,
             self.btn_clear_log, self.btn_open_folder, self.btn_open_file
         ]
@@ -576,7 +596,38 @@ Cara Penggunaan:
                     if temp_pdf_path and os.path.exists(temp_pdf_path): os.remove(temp_pdf_path)
                     continue
 
-            self._run_module(module_name, function_name, pdf_to_process, excel_path, password)
+            if module_name == 'AUTO':
+                # Lapisan 1: Deteksi Keyword untuk Prioritas
+                pdf_text = ""
+                try:
+                    reader_txt = PdfReader(pdf_to_process)
+                    if len(reader_txt.pages) > 0:
+                        pdf_text = (reader_txt.pages[0].extract_text() or "").upper()
+                except: pass
+
+                # Urutkan: yang keyword-nya cocok dicoba duluan
+                prioritized = []
+                others = []
+                for b_mod, b_func, keywords in self.AUTO_BANKS:
+                    if any(kw.upper() in pdf_text for kw in keywords): prioritized.append((b_mod, b_func))
+                    else: others.append((b_mod, b_func))
+
+                found = False
+                for b_mod, b_func in prioritized + others:
+                    try:
+                        self.log(f"Mencoba format: {b_mod}...", level="INFO")
+                        result = self._run_module(b_mod, b_func, pdf_to_process, excel_path, password)
+                        if result and isinstance(result, int) and result > 0:
+                            self.log(f"Berhasil! Terdeteksi sebagai format {b_mod}.", level="SUCCESS")
+                            found = True
+                            break
+                    except Exception:
+                        continue
+                if not found:
+                    self.log(f"Gagal mendeteksi format untuk: {base_name}", level="ERROR")
+            else:
+                self._run_module(module_name, function_name, pdf_to_process, excel_path, password)
+
             if temp_pdf_path and os.path.exists(temp_pdf_path):
                 try: os.remove(temp_pdf_path)
                 except Exception: pass
@@ -610,15 +661,16 @@ Cara Penggunaan:
             if 'output_excel_path' in sig.parameters: call_args['output_excel_path'] = excel_path
             if 'password' in sig.parameters and password is not None: call_args['password'] = password
 
-            func(**call_args)
+            res = func(**call_args)
 
             if os.path.exists(excel_path):
-                 self.log(f"Sukses! Saved to: {excel_path}\n", level="SUCCESS")
                  self.last_generated_file = excel_path
                  self.btn_open_file.configure(state="normal")
                  self.btn_open_folder.configure(state="normal")
             else:
                  self.log("Selesai, tapi file output tidak ditemukan.", level="RUN")
+            
+            return res
         except Exception as e:
             msg = str(e).lower()
             if "incorrect password" in msg or "not been decrypted" in msg:

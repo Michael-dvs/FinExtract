@@ -140,11 +140,11 @@ def extract_bni_data(pdf_path, output_excel):
 
     except Exception as e:
         print(f"Terjadi kesalahan saat membaca PDF: {e}")
-        return
+        return 0
 
     if not data_rows:
         print("Tidak ada data yang ditemukan atau format tabel tidak sesuai.")
-        return
+        return 0
 
     # Export ke Excel
     try:
@@ -156,9 +156,11 @@ def extract_bni_data(pdf_path, output_excel):
         
         df.to_excel(output_excel, index=False)
         print(f"\n[SUKSES] Data berhasil diekstrak dan disimpan di: {output_excel}")
+        return len(data_rows)
         
     except Exception as e:
         print(f"Gagal menyimpan file Excel: {e}")
+        return 0
 
 # --- BLOCK EKSEKUSI UTAMA ---
 if __name__ == "__main__":

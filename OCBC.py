@@ -46,7 +46,7 @@ def process_ocbc_final(pdf_path, output_excel_path, password=None):
 
     if not all_raw_rows:
         print("Data kosong atau tidak terbaca.")
-        return
+        return 0
 
     merged_data = []
     current_transaction = None
@@ -57,13 +57,15 @@ def process_ocbc_final(pdf_path, output_excel_path, password=None):
         if not any(row): continue
 
         row_str = " ".join(row).upper()
-        if 'TRANS' in row_str and ('URAIAN' in row_str or 'DESCRIPTION' in row_str):
+        # Validasi Ketat: OCBC harus punya TRANS, URAIAN, dan VALUTA
+        if 'TRANS' in row_str and ('URAIAN' in row_str or 'DESCRIPTION' in row_str) and 'VALUTA' in row_str:
             if not header_found:
                 headers = row
                 header_found = True
             continue 
         
-        if header_found and row == headers:
+        # Guard: Jangan proses baris apa pun jika header OCBC belum ditemukan
+        if not header_found:
             continue
 
         if is_new_transaction(row):
@@ -84,7 +86,7 @@ def process_ocbc_final(pdf_path, output_excel_path, password=None):
     if current_transaction:
         merged_data.append(current_transaction)
 
-    if not headers:
+    if not header_found or not merged_data:
         headers = ["TGL TRANS", "TGL VALUTA", "URAIAN", "DEBET", "KREDIT", "SALDO"]
     
 
@@ -108,8 +110,13 @@ def process_ocbc_final(pdf_path, output_excel_path, password=None):
     else:
         print("[Warning] Kolom Debit/Kredit tidak ditemukan otomatis. Penukaran dilewati.")
 
-    df.to_excel(output_excel_path, index=False)
-    print(f"Selesai! File tersimpan: {output_excel_path}")
+    try:
+        df.to_excel(output_excel_path, index=False)
+        print(f"Selesai! File tersimpan: {output_excel_path}")
+        return len(merged_data)
+    except Exception as e:
+        print(f"Gagal menyimpan file Excel: {e}")
+        return 0
 
 if __name__ == "__main__":
     raw_input = input("Drag & drop file PDF ke sini: ")

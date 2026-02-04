@@ -84,11 +84,14 @@ def extract_bri_text(pdf_path, excel_path):
     try:
         df.to_excel(excel_path, index=False)
         print(f"Data berhasil diekspor ke {excel_path} dengan {len(df)} baris.")
+        return len(data)
     except PermissionError:
         print(f"ERROR: Gagal menyimpan file ke '{excel_path}'.")
         print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
+        return 0
     except Exception as e:
         print(f"Terjadi error lain saat menyimpan: {e}")
+        return 0
 
 if __name__ == "__main__":
 

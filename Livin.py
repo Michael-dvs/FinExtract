@@ -161,9 +161,9 @@ def process_livin_statement(pdf_path):
 
         # Simpan
         df.to_excel(output_excel_path, index=False)
-        return True, f"Sukses! Kolom Ditukar & Rapih: {os.path.basename(output_excel_path)}"
+        return len(final_rows)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return False, f"Error: {str(e)}"
+        return 0
