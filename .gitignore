@@ -1,0 +1,10 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Settings & Config
+settings.json
+settings.json
+
+# macOS system files
+.DS_Store
