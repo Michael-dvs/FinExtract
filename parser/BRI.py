@@ -1,9 +1,9 @@
-import pdfplumber
-import pandas as pd
 import re
 import os
 
 def extract_bri_text(pdf_path, excel_path):
+    import pdfplumber
+    import pandas as pd
     columns = ["transaction_date", "description", "user_id", "debit", "credit", "balance"]
     data = []
 

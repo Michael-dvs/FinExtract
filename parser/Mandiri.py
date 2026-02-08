@@ -1,8 +1,9 @@
-import pdfplumber
-import pandas as pd
 import re
 
 def process_bank_statement(pdf_path, output_excel_path):
+    import pdfplumber
+    import pandas as pd
+
     print(f"Membaca file: {pdf_path}...")
     
     all_data = []

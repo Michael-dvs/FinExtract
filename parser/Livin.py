@@ -1,5 +1,3 @@
-import pdfplumber
-import pandas as pd
 import os
 import re
 from datetime import datetime
@@ -83,6 +81,9 @@ def align_bank_row(row_items):
     return [posting_date, remark, ref_no, debit, credit, balance]
 
 def process_livin_statement(pdf_path):
+    import pdfplumber
+    import pandas as pd
+
     try:
         base_name = os.path.splitext(pdf_path)[0]
         output_excel_path = f"{base_name}_livin.xlsx"

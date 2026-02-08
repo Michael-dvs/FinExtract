@@ -1,5 +1,3 @@
-import pdfplumber
-import pandas as pd
 import re
 import os
 
@@ -28,6 +26,9 @@ def clean_db_cr_flag(value_str):
     return None
 
 def extract_bni_data(pdf_path, output_excel):
+    import pdfplumber
+    import pandas as pd
+
     data_rows = []
     print(f"\nMemproses file: {pdf_path}...")
     

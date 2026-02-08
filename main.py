@@ -10,25 +10,25 @@ from logic import CoreLogic
 
 class MainController:
     def __init__(self):
-        # 1. Setup Queues untuk komunikasi Thread
+        #Setup Queues untuk komunikasi Thread
         self.status_queue = queue.Queue()
         self.request_queue = queue.Queue()
 
-        # 2. Inisialisasi Logic
+        #Inisialisasi Logic
         self.logic = CoreLogic(self.status_queue, self.request_queue)
         
-        # 3. Inisialisasi GUI
+        #Inisialisasi GUI
         self.ui = FinextractUI(settings_callback=self.save_settings)
         
-        # 4. Load Settings & Apply
+        #Load Settings & Apply
         self.settings = self.logic.load_settings()
         ctk.set_appearance_mode(self.settings.get("appearance_mode", "System"))
         self.ui.apply_theme(self.settings.get("theme_name", "Default (Blue)"))
 
-        # 5. Hubungkan Action GUI ke Logic
+        #Hubungkan Action GUI ke Logic
         self.ui.set_process_callback(self.start_processing)
 
-        # 6. Mulai Loop Pengecekan Queue
+        #Mulai Loop Pengecekan Queue
         self.ui.after(100, self.check_queues)
 
     def save_settings(self):
@@ -57,7 +57,7 @@ class MainController:
     def check_queues(self):
         """Loop utama untuk update UI dari background thread"""
         try:
-            # 1. Cek Log
+            #Cek Log
             while True:
                 msg_type, msg_content, level = self.status_queue.get_nowait()
                 if msg_type == "LOG":
@@ -68,7 +68,7 @@ class MainController:
             pass
 
         try:
-            # 2. Cek Request (Popup Password / Overwrite)
+            #Cek Request (Popup Password / Overwrite)
             while True:
                 task_name, kwargs, result_q = self.request_queue.get_nowait()
                 
@@ -90,7 +90,6 @@ class MainController:
         self.ui.mainloop()
 
 if __name__ == '__main__':
-    # Pastikan direktori saat ini ada di sys.path agar import modul dinamis (parser.*) berjalan
     base_dir = os.path.dirname(os.path.abspath(__file__))
     if base_dir not in sys.path:
         sys.path.insert(0, base_dir)

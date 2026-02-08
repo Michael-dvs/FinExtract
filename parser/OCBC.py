@@ -1,5 +1,3 @@
-import pdfplumber
-import pandas as pd
 import os
 import re
 
@@ -28,6 +26,8 @@ def is_new_transaction(row):
     return False
 
 def process_ocbc_final(pdf_path, output_excel_path, password=None):
+    import pdfplumber
+    import pandas as pd
     print(f"Membaca file: {pdf_path}...")
     
     all_raw_rows = []

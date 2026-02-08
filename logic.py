@@ -7,12 +7,6 @@ import tempfile
 import queue
 from config import AUTO_BANKS
 
-try:
-    from pypdf import PdfReader, PdfWriter
-except ImportError:
-    PdfReader = None
-    PdfWriter = None
-
 class CoreLogic:
     def __init__(self, status_queue, request_queue):
         self.status_queue = status_queue
@@ -56,6 +50,12 @@ class CoreLogic:
             return None    
 
     def _process_queue(self, module_name, function_name, file_list, output_folder):
+        try:
+            from pypdf import PdfReader, PdfWriter
+        except ImportError:
+            PdfReader = None
+            PdfWriter = None
+
         files_processed = 0
         for pdf_path in file_list:
             pdf_path = pdf_path.strip()
@@ -191,7 +191,6 @@ class CoreLogic:
     def _run_module(self, module_name, function_name, pdf_path, excel_path, password=None):
         try:
             mod = importlib.import_module(module_name)
-            importlib.reload(mod)
             func = getattr(mod, function_name, None)
             
             if not func:
