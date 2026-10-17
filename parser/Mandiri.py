@@ -1,6 +1,8 @@
 import re
+from typing import Any, Optional
 
-def process_bank_statement(pdf_path, output_excel_path):
+def parse(pdf_path: str, output_excel_path: str, password: str | None = None) -> int:
+    """Ekstraksi mutasi Bank Mandiri dari PDF ke file Excel."""
     import pdfplumber
     import pandas as pd
 
@@ -45,11 +47,8 @@ def process_bank_statement(pdf_path, output_excel_path):
 
     if col_debit and col_credit:
         print(f"Menukar data kolom '{col_debit}' dengan '{col_credit}'...")
-
-        temp_debit_data = df[col_debit].copy()
-        
-        df[col_debit] = df[col_credit] 
-        df[col_credit] = temp_debit_data 
+        from utils import swap_columns
+        swap_columns(df, col_debit, col_credit)
     else:
         print("Peringatan: Kolom Debit atau Credit tidak ditemukan secara otomatis.")
 
@@ -57,15 +56,27 @@ def process_bank_statement(pdf_path, output_excel_path):
         df.to_excel(output_excel_path, index=False)
         print(f"Selesai! Data tersimpan di: {output_excel_path}")
         return len(all_data)
+    except PermissionError:
+        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
+        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
+        return 0
     except Exception as e:
         print(f"Gagal menyimpan file Excel: {e}")
         return 0
 
-file_pdf = "/Users/maikerudesu/Downloads/Rekening koran oktober 2025 2/IBIZ_203901081020303_20251001_20251031_1762394240800866720.pdf"
-file_output = "mandiri1test.xlsx"
+# Backward compatibility alias
+process_bank_statement = parse
+
+
+def parse_ocr(pdf_path: str, output_excel_path: str, password: str | None = None, progress_callback: Any = None) -> int:
+    """Ekstraksi mutasi Mandiri via OCR lokal (menggunakan parser Livin/Mandiri OCR)."""
+    from parser.Livin import parse_ocr as livin_parse_ocr
+    return livin_parse_ocr(pdf_path, output_excel_path, password=password, progress_callback=progress_callback)
+
 
 if __name__ == "__main__":
-    try:
-        process_bank_statement(file_pdf, file_output)
-    except Exception as e:
-        print(f"Terjadi kesalahan: {e}")
+    import sys
+    if len(sys.argv) > 2:
+        process_bank_statement(sys.argv[1], sys.argv[2])
+    else:
+        print("Penggunaan: python Mandiri.py <input.pdf> <output.xlsx>")

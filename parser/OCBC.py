@@ -114,9 +114,16 @@ def process_ocbc_final(pdf_path, output_excel_path, password=None):
         df.to_excel(output_excel_path, index=False)
         print(f"Selesai! File tersimpan: {output_excel_path}")
         return len(merged_data)
+    except PermissionError:
+        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
+        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
+        return 0
     except Exception as e:
         print(f"Gagal menyimpan file Excel: {e}")
         return 0
+
+# Standardized parser alias
+parse = process_ocbc_final
 
 if __name__ == "__main__":
     raw_input = input("Drag & drop file PDF ke sini: ")

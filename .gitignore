@@ -4,7 +4,20 @@ __pycache__/
 
 # Settings & Config
 settings.json
-settings.json
+FinExtract_Settings.json
+
+# Build & Dist
+build/
+dist/
+.venv/
+.vscode/
+.env
+
+# Sensitive data and test files
+Rekkor/
+*.xlsx
+*.pdf
+scratch/
 
 # macOS system files
 .DS_Store

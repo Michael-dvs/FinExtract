@@ -158,10 +158,16 @@ def extract_bni_data(pdf_path, output_excel):
         df.to_excel(output_excel, index=False)
         print(f"\n[SUKSES] Data berhasil diekstrak dan disimpan di: {output_excel}")
         return len(data_rows)
-        
+    except PermissionError:
+        print(f"ERROR: Gagal menyimpan file ke '{output_excel}'.")
+        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
+        return 0
     except Exception as e:
         print(f"Gagal menyimpan file Excel: {e}")
         return 0
+
+# Standardized parser alias
+parse = extract_bni_data
 
 # --- BLOCK EKSEKUSI UTAMA ---
 if __name__ == "__main__":

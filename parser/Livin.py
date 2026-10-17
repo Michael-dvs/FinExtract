@@ -1,13 +1,9 @@
 import os
 import re
 from datetime import datetime
+from typing import Any, Optional
 
-def clean_text(text):
-    """Membersihkan teks dari newline dan spasi berlebih."""
-    if text is None:
-        return ""
-    text_str = str(text).replace('\n', ' ')
-    return re.sub(r'\s+', ' ', text_str).strip()
+from utils import clean_text, swap_columns
 
 def format_date_excel(date_str):
     """Mengubah '01 Dec 2025' menjadi '01/12/2025' dan membuang jam."""
@@ -80,14 +76,78 @@ def align_bank_row(row_items):
 
     return [posting_date, remark, ref_no, debit, credit, balance]
 
-def process_livin_statement(pdf_path):
-    import pdfplumber
+def process_raw_rows(raw_rows: list, output_excel_path: str) -> int:
+    """Memproses raw_rows hasil ekstraksi (baik dari scraping maupun OCR) menjadi file Excel."""
     import pandas as pd
 
+    if not raw_rows:
+        return 0
+
+    # --- MERGE ROWS ---
+    merged_data = []
+    current_transaction = None
+
+    for row in raw_rows:
+        col_first = row[0] if len(row) > 0 else ""
+        
+        if is_date_start(col_first):
+            if current_transaction:
+                merged_data.append(current_transaction)
+            current_transaction = row
+        else:
+            if current_transaction:
+                for idx in range(1, len(row)):
+                    if idx < len(current_transaction):
+                        text_fragment = row[idx]
+                        if text_fragment:
+                            current_transaction[idx] += " " + text_fragment
+
+    if current_transaction:
+        merged_data.append(current_transaction)
+
+    # --- ALIGN COLUMNS ---
+    final_rows = []
+    for row in merged_data:
+        aligned_row = align_bank_row(row)
+        final_rows.append(aligned_row)
+
+    # --- BUILD DATAFRAME ---
+    fixed_headers = ["Posting Date", "Remark", "Reference No", "Debit", "Credit", "Balance"]
+    df = pd.DataFrame(final_rows, columns=fixed_headers)
+
+    if "Posting Date" in df.columns:
+        df["Posting Date"] = df["Posting Date"].apply(format_date_excel)
+
+    # Menukar isi kolom Debit dengan Credit, dan sebaliknya
+    print("Menukar posisi kolom Debit dan Credit...")
+    swap_columns(df, "Debit", "Credit")
+
+    # Simpan
     try:
-        base_name = os.path.splitext(pdf_path)[0]
-        output_excel_path = f"{base_name}_livin.xlsx"
-        print(f"[LIVIN] Memproses: {os.path.basename(pdf_path)}...")
+        df.to_excel(output_excel_path, index=False)
+        return len(final_rows)
+    except PermissionError:
+        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
+        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
+        return 0
+    except Exception as e:
+        print(f"Gagal menyimpan file Excel: {e}")
+        return 0
+
+
+def parse(pdf_path: str, output_excel_path: str | None = None, password: str | None = None) -> int:
+    """Ekstraksi mutasi Livin' by Mandiri dari PDF ke file Excel via scraping."""
+    import pdfplumber
+
+    try:
+        if not output_excel_path:
+            base_name = os.path.splitext(pdf_path)[0]
+            output_excel_path = f"{base_name}_livin.xlsx"
+        elif os.path.isdir(output_excel_path):
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+            output_excel_path = os.path.join(output_excel_path, f"{base_name}_livin.xlsx")
+
+        print(f"[LIVIN] Memproses (Scraping): {os.path.basename(pdf_path)}...")
         
         raw_rows = []
         
@@ -117,54 +177,58 @@ def process_livin_statement(pdf_path):
                             raw_rows.append(cleaned_row)
 
         if not raw_rows:
-            return False, "Gagal mengekstrak data tabel."
+            return 0
 
-        # --- MERGE ROWS ---
-        merged_data = []
-        current_transaction = None
+        return process_raw_rows(raw_rows, output_excel_path)
 
-        for row in raw_rows:
-            col_first = row[0] if len(row) > 0 else ""
-            
-            if is_date_start(col_first):
-                if current_transaction:
-                    merged_data.append(current_transaction)
-                current_transaction = row
-            else:
-                if current_transaction:
-                    for idx in range(1, len(row)):
-                        if idx < len(current_transaction):
-                            text_fragment = row[idx]
-                            if text_fragment:
-                                current_transaction[idx] += " " + text_fragment
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise
 
-        if current_transaction:
-            merged_data.append(current_transaction)
 
-        # --- ALIGN COLUMNS ---
-        final_rows = []
-        for row in merged_data:
-            aligned_row = align_bank_row(row)
-            final_rows.append(aligned_row)
+def parse_ocr(
+    pdf_path: str,
+    output_excel_path: str | None = None,
+    password: str | None = None,
+    progress_callback: Any = None
+) -> int:
+    """Ekstraksi mutasi Livin' by Mandiri dari PDF ke file Excel via OCR lokal."""
+    try:
+        from ocr_engine import extract_pdf_ocr_raw_rows, LIVIN_COLUMNS_FRACTION
 
-        # --- BUILD DATAFRAME ---
-        fixed_headers = ["Posting Date", "Remark", "Reference No", "Debit", "Credit", "Balance"]
-        df = pd.DataFrame(final_rows, columns=fixed_headers)
+        if not output_excel_path:
+            base_name = os.path.splitext(pdf_path)[0]
+            output_excel_path = f"{base_name}_livin.xlsx"
+        elif os.path.isdir(output_excel_path):
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+            output_excel_path = os.path.join(output_excel_path, f"{base_name}_livin.xlsx")
 
-        if "Posting Date" in df.columns:
-            df["Posting Date"] = df["Posting Date"].apply(format_date_excel)
+        print(f"[LIVIN] Memproses (OCR): {os.path.basename(pdf_path)}...")
 
-        # Menukar isi kolom Debit dengan Credit, dan sebaliknya
-        print("Menukar posisi kolom Debit dan Credit...")
-        temp_debit = df["Debit"].copy()
-        df["Debit"] = df["Credit"]
-        df["Credit"] = temp_debit
+        raw_rows = extract_pdf_ocr_raw_rows(
+            pdf_path=pdf_path,
+            columns_fraction=LIVIN_COLUMNS_FRACTION,
+            dpi=200,
+            progress_callback=progress_callback
+        )
 
-        # Simpan
-        df.to_excel(output_excel_path, index=False)
-        return len(final_rows)
+        cleaned_raw_rows = []
+        for r in raw_rows:
+            cleaned_row = [clean_text(c) for c in r]
+            if any(cleaned_row):
+                cleaned_raw_rows.append(cleaned_row)
+
+        if not cleaned_raw_rows:
+            return 0
+
+        return process_raw_rows(cleaned_raw_rows, output_excel_path)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return 0
+
+
+# Backward compatibility alias
+process_livin_statement = parse

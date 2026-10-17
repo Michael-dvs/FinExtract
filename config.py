@@ -1,3 +1,9 @@
+# --- KONSTANTA APLIKASI ---
+APP_NAME = "FinExtract"
+APP_VERSION = "v1.0.8"
+APP_TITLE = f"{APP_NAME} {APP_VERSION}"
+SETTINGS_FILE_NAME = "FinExtract_Settings.json"
+
 # --- KONFIGURASI TEMA MENYELURUH ---
 THEME_CONFIG = {
     "Default (Blue)": {

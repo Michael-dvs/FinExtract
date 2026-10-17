@@ -1,7 +1,8 @@
 import re
 import os
 
-def extract_bri_text(pdf_path, excel_path):
+def parse(pdf_path: str, output_excel_path: str, password: str | None = None) -> int:
+    """Ekstraksi mutasi BRI dari PDF ke file Excel."""
     import pdfplumber
     import pandas as pd
     columns = ["transaction_date", "description", "user_id", "debit", "credit", "balance"]
@@ -82,34 +83,23 @@ def extract_bri_text(pdf_path, excel_path):
     
     # Error handling permission
     try:
-        df.to_excel(excel_path, index=False)
-        print(f"Data berhasil diekspor ke {excel_path} dengan {len(df)} baris.")
+        df.to_excel(output_excel_path, index=False)
+        print(f"Data berhasil diekspor ke {output_excel_path} dengan {len(df)} baris.")
         return len(data)
     except PermissionError:
-        print(f"ERROR: Gagal menyimpan file ke '{excel_path}'.")
+        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
         print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
         return 0
     except Exception as e:
         print(f"Terjadi error lain saat menyimpan: {e}")
         return 0
 
+# Backward compatibility alias
+extract_bri_text = parse
+
 if __name__ == "__main__":
-
-    #for windows:
-    #pdf_path = r"C:\Users\Maikeru\Downloads\Rekap Rekening koran jan-june 2025\Rekap Rekening koran jan-june 2025\Rekening koran juli 2025\BRI\Mutasi Juli Rekening BRI 203901000446308.pdf"
-    #excel_path = input("Masukkan nama file Excel output (misal: hasil_bri.xlsx): ")+".xlsx"
-    #extract_bri_text(pdf_path, excel_path)
-
-    #for macOS/Linux:
-    folder_path = "/Users/maikerudesu/Downloads/Rekening koran oktober 2025"
-
-    if os.path.exists(folder_path):
-        print(f"Membaca direktori: {folder_path}")
-        for filename in os.listdir(folder_path):
-            if filename.lower().endswith(".pdf"):
-                full_pdf_path = os.path.join(folder_path, filename)
-                output_excel = os.path.join(folder_path, os.path.splitext(filename)[0] + ".xlsx")
-                print(f"Memproses: {filename}")
-                extract_bri_text(full_pdf_path, output_excel)
+    import sys
+    if len(sys.argv) > 2:
+        extract_bri_text(sys.argv[1], sys.argv[2])
     else:
-        print(f"Folder tidak ditemukan: {folder_path}")
+        print("Penggunaan: python BRI.py <input.pdf> <output.xlsx>")

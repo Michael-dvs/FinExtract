@@ -4,7 +4,8 @@ import tkinter as tk
 import subprocess
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from config import THEME_CONFIG
+from config import THEME_CONFIG, APP_TITLE
+from utils import open_system_path
 
 # --- Mac OS Font Fix ---
 if sys.platform == "darwin":
@@ -137,7 +138,7 @@ class PasswordDialog(ctk.CTkToplevel):
 class FinextractUI(ctk.CTk):
     def __init__(self, settings_callback=None):
         super().__init__()
-        self.title("FinExtract v1.0.8")
+        self.title(APP_TITLE)
         
         window_width = 950
         window_height = 650
@@ -195,13 +196,24 @@ Cara Penggunaan:
         self.btn_bri = ctk.CTkButton(self.sidebar, text="BRI", command=lambda: self.trigger_process('parser.BRI', 'extract_bri_text'))
         self.btn_bri.grid(row=4, column=0, padx=20, pady=10)
         self.btn_auto = ctk.CTkButton(self.sidebar, text="✨ Auto Detect Bank", fg_color="#27ae60", hover_color="#219150", command=lambda: self.trigger_process('AUTO', ''))
-        self.btn_auto.grid(row=6, column=0, padx=20, pady=(20, 10))
+        self.btn_auto.grid(row=6, column=0, padx=20, pady=(20, 5))
+
+        self.lbl_fallback_info = ctk.CTkLabel(
+            self.sidebar,
+            text="*PDF scan otomatis via OCR\n(Mandiri didukung; bank lain [DATA BELUM TERSEDIA])",
+            font=ctk.CTkFont(size=9),
+            text_color="gray60",
+            justify="center"
+        )
+        self.lbl_fallback_info.grid(row=7, column=0, padx=10, pady=(0, 10))
+
+        self.sidebar.grid_rowconfigure(8, weight=1) 
 
         self.btn_settings = ctk.CTkButton(self.sidebar, text="⚙ Settings", command=self.open_settings)
-        self.btn_settings.grid(row=8, column=0, padx=20, pady=(20, 10), sticky="s")
+        self.btn_settings.grid(row=9, column=0, padx=20, pady=(20, 10), sticky="s")
 
-        self.lbl_credit = ctk.CTkLabel(self.sidebar, text="FinExtract v1.0.8\nBy Michael Aristyo R.", font=ctk.CTkFont(size=10))
-        self.lbl_credit.grid(row=9, column=0, padx=10, pady=(0, 10), sticky="s")
+        self.lbl_credit = ctk.CTkLabel(self.sidebar, text=f"{APP_TITLE}\nBy Michael Aristyo R.", font=ctk.CTkFont(size=10))
+        self.lbl_credit.grid(row=10, column=0, padx=10, pady=(0, 10), sticky="s")
 
     def _setup_main_frame(self):
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
@@ -246,6 +258,7 @@ Cara Penggunaan:
 
         self.logbox.tag_config("SUCCESS", foreground="#00B140") 
         self.logbox.tag_config("ERROR", foreground="#E74C3C")   
+        self.logbox.tag_config("WARNING", foreground="#E67E22")
         self.logbox.tag_config("PATH", foreground="#3498DB")    
         self.logbox.tag_config("RUN", foreground="#F1C40F")     
         self.logbox.tag_config("SEPARATOR", foreground="#95A5A6")
@@ -269,7 +282,7 @@ Cara Penggunaan:
         ]
         self.all_labels = [
             self.lbl_sidebar_title, self.lbl_credit,
-            self.lbl_input, self.lbl_output, self.lbl_log_title
+            self.lbl_input, self.lbl_output, self.lbl_log_title, self.lbl_fallback_info
         ]
         self.all_frames = [self.io_frame]
         self.all_entries = [self.input_textbox, self.output_entry]
@@ -340,23 +353,12 @@ Cara Penggunaan:
 
     def open_output_folder(self):
         folder_path = self.output_entry.get()
-        if not folder_path or not os.path.isdir(folder_path): return
-        try:
-            if sys.platform == "win32": os.startfile(folder_path)
-            elif sys.platform == "darwin": subprocess.Popen(["open", folder_path])
-            else: subprocess.Popen(["xdg-open", folder_path])
-        except Exception: pass
+        if folder_path and os.path.isdir(folder_path):
+            open_system_path(folder_path)
 
     def open_output_file(self):
         if self.last_generated_file and os.path.isfile(self.last_generated_file):
-            try:
-                if sys.platform == "win32":
-                    os.startfile(self.last_generated_file)
-                elif sys.platform == "darwin":
-                    subprocess.Popen(["open", self.last_generated_file])
-                else:
-                    subprocess.Popen(["xdg-open", self.last_generated_file])
-            except Exception: pass
+            open_system_path(self.last_generated_file)
 
     def clear_log(self):
         self.logbox.configure(state="normal")
