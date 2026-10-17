@@ -18,7 +18,10 @@ class MainController:
         self.logic = CoreLogic(self.status_queue, self.request_queue)
         
         #Inisialisasi GUI
-        self.ui = FinextractUI(settings_callback=self.save_settings)
+        self.ui = FinextractUI(
+            settings_callback=self.save_settings,
+            settings_manager=self.logic.settings_manager
+        )
         
         #Load Settings & Apply
         self.settings = self.logic.load_settings()
@@ -33,11 +36,10 @@ class MainController:
 
     def save_settings(self):
         """Callback saat user mengubah setting di GUI"""
-        new_settings = {
-            "appearance_mode": ctk.get_appearance_mode(),
-            "theme_name": self.ui.current_theme_key
-        }
-        self.logic.save_settings(new_settings)
+        latest = self.logic.load_settings()
+        latest.appearance_mode = ctk.get_appearance_mode()
+        latest.theme_name = self.ui.current_theme_key
+        self.logic.save_settings(latest)
 
     def start_processing(self, module_name, function_name):
         """Dipanggil saat tombol bank diklik"""

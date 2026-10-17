@@ -1,7 +1,9 @@
 import re
 import os
 
-def parse(pdf_path: str, output_excel_path: str, password: str | None = None) -> int:
+from typing import Any, Optional
+
+def parse(pdf_path: str, output_excel_path: str, password: str | None = None, settings: Any = None) -> int:
     """Ekstraksi mutasi BRI dari PDF ke file Excel."""
     import pdfplumber
     import pandas as pd
@@ -81,18 +83,9 @@ def parse(pdf_path: str, output_excel_path: str, password: str | None = None) ->
 
     df = pd.DataFrame(data, columns=columns)
     
-    # Error handling permission
-    try:
-        df.to_excel(output_excel_path, index=False)
-        print(f"Data berhasil diekspor ke {output_excel_path} dengan {len(df)} baris.")
-        return len(data)
-    except PermissionError:
-        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
-        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
-        return 0
-    except Exception as e:
-        print(f"Terjadi error lain saat menyimpan: {e}")
-        return 0
+    from exporter import export_dataframe_to_excel
+    return export_dataframe_to_excel(df, output_excel_path, settings=settings)
+
 
 # Backward compatibility alias
 extract_bri_text = parse

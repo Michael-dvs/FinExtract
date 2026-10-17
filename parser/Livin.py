@@ -76,7 +76,7 @@ def align_bank_row(row_items):
 
     return [posting_date, remark, ref_no, debit, credit, balance]
 
-def process_raw_rows(raw_rows: list, output_excel_path: str) -> int:
+def process_raw_rows(raw_rows: list, output_excel_path: str, settings: Any = None) -> int:
     """Memproses raw_rows hasil ekstraksi (baik dari scraping maupun OCR) menjadi file Excel."""
     import pandas as pd
 
@@ -122,20 +122,18 @@ def process_raw_rows(raw_rows: list, output_excel_path: str) -> int:
     print("Menukar posisi kolom Debit dan Credit...")
     swap_columns(df, "Debit", "Credit")
 
-    # Simpan
-    try:
-        df.to_excel(output_excel_path, index=False)
-        return len(final_rows)
-    except PermissionError:
-        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
-        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
-        return 0
-    except Exception as e:
-        print(f"Gagal menyimpan file Excel: {e}")
-        return 0
+    # Simpan via unified exporter
+    from exporter import export_dataframe_to_excel
+    return export_dataframe_to_excel(df, output_excel_path, settings=settings)
 
 
-def parse(pdf_path: str, output_excel_path: str | None = None, password: str | None = None) -> int:
+
+def parse(
+    pdf_path: str,
+    output_excel_path: str | None = None,
+    password: str | None = None,
+    settings: Any = None
+) -> int:
     """Ekstraksi mutasi Livin' by Mandiri dari PDF ke file Excel via scraping."""
     import pdfplumber
 
@@ -179,7 +177,7 @@ def parse(pdf_path: str, output_excel_path: str | None = None, password: str | N
         if not raw_rows:
             return 0
 
-        return process_raw_rows(raw_rows, output_excel_path)
+        return process_raw_rows(raw_rows, output_excel_path, settings=settings)
 
     except Exception as e:
         import traceback
@@ -191,7 +189,8 @@ def parse_ocr(
     pdf_path: str,
     output_excel_path: str | None = None,
     password: str | None = None,
-    progress_callback: Any = None
+    progress_callback: Any = None,
+    settings: Any = None
 ) -> int:
     """Ekstraksi mutasi Livin' by Mandiri dari PDF ke file Excel via OCR lokal."""
     try:
@@ -222,7 +221,7 @@ def parse_ocr(
         if not cleaned_raw_rows:
             return 0
 
-        return process_raw_rows(cleaned_raw_rows, output_excel_path)
+        return process_raw_rows(cleaned_raw_rows, output_excel_path, settings=settings)
 
     except Exception as e:
         import traceback

@@ -25,7 +25,7 @@ def clean_db_cr_flag(value_str):
         return 'C'
     return None
 
-def extract_bni_data(pdf_path, output_excel):
+def extract_bni_data(pdf_path, output_excel, settings=None):
     import pdfplumber
     import pandas as pd
 
@@ -148,23 +148,8 @@ def extract_bni_data(pdf_path, output_excel):
         return 0
 
     # Export ke Excel
-    try:
-        df = pd.DataFrame(data_rows)
-        df['Remark'] = df['Remark'].str.replace(r'\s+', ' ', regex=True).str.strip()
-        
-        print("\nPreview 5 Data Teratas:")
-        print(df.head())
-        
-        df.to_excel(output_excel, index=False)
-        print(f"\n[SUKSES] Data berhasil diekstrak dan disimpan di: {output_excel}")
-        return len(data_rows)
-    except PermissionError:
-        print(f"ERROR: Gagal menyimpan file ke '{output_excel}'.")
-        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
-        return 0
-    except Exception as e:
-        print(f"Gagal menyimpan file Excel: {e}")
-        return 0
+    from exporter import export_dataframe_to_excel
+    return export_dataframe_to_excel(df, output_excel, settings=settings)
 
 # Standardized parser alias
 parse = extract_bni_data

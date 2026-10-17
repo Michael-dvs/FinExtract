@@ -7,6 +7,8 @@ import inspect
 import queue
 from typing import Any, Dict, List, Optional, Tuple
 from config import AUTO_BANKS, SETTINGS_FILE_NAME
+from settings import Settings, SettingsManager
+from formatters import format_output_filename, mask_sensitive_text
 
 
 class CoreLogic:
@@ -18,27 +20,25 @@ class CoreLogic:
     def __init__(self, status_queue: queue.Queue, request_queue: queue.Queue):
         self.status_queue = status_queue
         self.request_queue = request_queue
-        self.config_file = os.path.join(os.path.expanduser("~"), SETTINGS_FILE_NAME)
+        self.settings_manager = SettingsManager()
         self.AUTO_BANKS = AUTO_BANKS
+        self._active_settings: Optional[Settings] = None
 
-    def load_settings(self) -> Dict[str, Any]:
-        """Membaca pengaturan tampilan dari file json di direktori pengguna."""
-        default = {"appearance_mode": "System", "theme_name": "Default (Blue)"}
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, "r") as f:
-                    return json.load(f)
-        except Exception:
-            pass
-        return default
+    @property
+    def config_file(self) -> str:
+        return self.settings_manager.config_file
 
-    def save_settings(self, settings: Dict[str, Any]) -> None:
-        """Menyimpan pengaturan tampilan pengguna."""
-        try:
-            with open(self.config_file, "w") as f:
-                json.dump(settings, f)
-        except Exception:
-            pass
+    @config_file.setter
+    def config_file(self, value: str) -> None:
+        self.settings_manager.config_file = value
+
+    def load_settings(self) -> Settings:
+        """Membaca pengaturan dari file konfigurasi pengguna."""
+        return self.settings_manager.load()
+
+    def save_settings(self, settings: Any) -> None:
+        """Menyimpan pengaturan pengguna secara atomik."""
+        self.settings_manager.save(settings)
 
     def start_processing_thread(
         self,
@@ -57,6 +57,12 @@ class CoreLogic:
 
     def _log(self, message: str, level: str = "DEFAULT") -> None:
         """Mengirim pesan log ke antarmuka pengguna."""
+        try:
+            active_settings = getattr(self, "_active_settings", None)
+            if active_settings and getattr(active_settings, "mask_sensitive_logs", False):
+                message = mask_sensitive_text(message)
+        except Exception:
+            pass
         self.status_queue.put(("LOG", message, level))
 
     def _request_gui(self, task_name: str, **kwargs) -> Any:
@@ -190,8 +196,12 @@ class CoreLogic:
         output_folder: str,
         PdfReader: Any,
         PdfWriter: Any,
+        settings: Optional[Settings] = None,
     ) -> Optional[bool]:
         """Memproses satu file PDF dari awal sampai akhir via extract_statement."""
+        if settings is None:
+            settings = Settings()
+
         is_ok, password = self._authenticate_pdf(pdf_path, PdfReader)
         if not is_ok:
             return False
@@ -202,15 +212,30 @@ class CoreLogic:
                 pdf_path, password, PdfReader, PdfWriter
             )
 
-            base_name = os.path.basename(pdf_path)
-            file_name, _ = os.path.splitext(base_name)
-            excel_path = os.path.join(output_folder, f"{file_name}.xlsx")
+            bank_label = module_name.replace("parser.", "")
+            excel_filename = format_output_filename(
+                settings.file_naming_pattern,
+                pdf_path=pdf_path,
+                bank_name=bank_label,
+            )
+            excel_path = os.path.join(output_folder, excel_filename)
 
-            overwrite_decision = self._check_overwrite_permission(excel_path)
-            if overwrite_decision is None:
-                return None  # Batalkan seluruh antrean
-            if not overwrite_decision:
-                return False  # Lewati file ini
+            if os.path.exists(excel_path):
+                if settings.overwrite_mode == "overwrite":
+                    pass
+                elif settings.overwrite_mode == "rename":
+                    base_dir = os.path.dirname(excel_path)
+                    stem, ext = os.path.splitext(os.path.basename(excel_path))
+                    c = 1
+                    while os.path.exists(os.path.join(base_dir, f"{stem} ({c}){ext}")):
+                        c += 1
+                    excel_path = os.path.join(base_dir, f"{stem} ({c}){ext}")
+                else:  # "ask"
+                    overwrite_decision = self._check_overwrite_permission(excel_path)
+                    if overwrite_decision is None:
+                        return None  # Batalkan seluruh antrean
+                    if not overwrite_decision:
+                        return False  # Lewati file ini
 
             count = extract_statement(
                 pdf_path=pdf_to_process,
@@ -220,10 +245,17 @@ class CoreLogic:
                 password=password,
                 log_callback=self._log,
                 progress_callback=lambda curr, tot, msg: self._log(msg, "INFO"),
+                settings=settings,
             )
 
             if count > 0:
                 self.status_queue.put(("FILE", excel_path, "SUCCESS"))
+                if settings.auto_open_output:
+                    try:
+                        from utils import open_system_path
+                        open_system_path(excel_path)
+                    except Exception:
+                        pass
                 return True
             else:
                 return False
@@ -249,6 +281,9 @@ class CoreLogic:
             PdfReader = None
             PdfWriter = None
 
+        settings_snapshot = self.settings_manager.load()
+        self._active_settings = settings_snapshot
+
         files_processed = 0
         for pdf_path in file_list:
             pdf_path = pdf_path.strip()
@@ -256,7 +291,13 @@ class CoreLogic:
                 continue
 
             status = self._process_single_file(
-                pdf_path, module_name, function_name, output_folder, PdfReader, PdfWriter
+                pdf_path,
+                module_name,
+                function_name,
+                output_folder,
+                PdfReader,
+                PdfWriter,
+                settings=settings_snapshot,
             )
             if status is None:
                 break
@@ -275,6 +316,7 @@ class CoreLogic:
         pdf_path: str,
         excel_path: str,
         password: Optional[str] = None,
+        settings: Optional[Any] = None,
     ) -> Any:
         """Helper backward-compatibility untuk pemanggilan parser modul."""
         try:
@@ -285,6 +327,7 @@ class CoreLogic:
                 excel_path,
                 password,
                 progress_callback=lambda curr, tot, msg: self._log(msg, "INFO"),
+                settings=settings,
             )
         except Exception as e:
             return False
@@ -315,6 +358,7 @@ def _call_parser_func(
     excel_path: str,
     password: Optional[str] = None,
     progress_callback: Optional[Any] = None,
+    settings: Optional[Any] = None,
 ) -> Any:
     """Memanggil fungsi parser bank secara dinamis dengan parameter yang sesuai."""
     mod = importlib.import_module(module_name)
@@ -340,6 +384,8 @@ def _call_parser_func(
         call_args["password"] = password
     if "progress_callback" in sig.parameters and progress_callback:
         call_args["progress_callback"] = progress_callback
+    if "settings" in sig.parameters and settings is not None:
+        call_args["settings"] = settings
 
     return func(**call_args)
 
@@ -352,6 +398,7 @@ def extract_statement(
     password: Optional[str] = None,
     log_callback: Optional[Any] = None,
     progress_callback: Optional[Any] = None,
+    settings: Optional[Settings] = None,
 ) -> int:
     """Titik masuk ekstraksi terpadu di lapisan inti (Scraping utama + Fallback OCR otomatis).
 
@@ -363,8 +410,13 @@ def extract_statement(
     4. Fallback OCR HANYA aktif jika scraping selesai membaca file TANPA error, tetapi hasilnya
        nol baris data / nol transaksi (is_empty_result).
     """
+    if settings is None:
+        settings = Settings()
+
     def _log(msg: str, level: str = "DEFAULT"):
         if log_callback:
+            if settings and getattr(settings, "mask_sensitive_logs", False):
+                msg = mask_sensitive_text(msg)
             log_callback(msg, level)
 
     if not os.path.exists(pdf_path):
@@ -399,7 +451,7 @@ def extract_statement(
         for b_mod, b_func in prioritized + others:
             try:
                 _log(f"Auto-detect mencoba scraping: {b_mod}...", "INFO")
-                res = _call_parser_func(b_mod, b_func, pdf_path, excel_path, password)
+                res = _call_parser_func(b_mod, b_func, pdf_path, excel_path, password, settings=settings)
                 if res and isinstance(res, int) and res > 0:
                     _log(f"Berhasil! Terdeteksi sebagai format {b_mod} ({res} transaksi).", "SUCCESS")
                     return res
@@ -414,7 +466,7 @@ def extract_statement(
         try:
             _log(f"Menjalankan ekstraksi scraping: {module_name}...", "RUN")
             scraping_res = _call_parser_func(
-                module_name, function_name, pdf_path, excel_path, password
+                module_name, function_name, pdf_path, excel_path, password, settings=settings
             )
         except Exception as e:
             # Error saat pembacaan file/PDF (PDF rusak, tidak valid, dsb)
@@ -435,6 +487,10 @@ def extract_statement(
 
     # --- JALUR 3: FALLBACK OCR (HANYA JIKA is_empty_result TRUE) ---
     if not is_scraping_empty:
+        return 0
+
+    if not getattr(settings, "ocr_fallback_enabled", True):
+        _log("Scraping tidak menghasilkan transaksi. Fallback OCR dinonaktifkan dalam Pengaturan.", "INFO")
         return 0
 
     _log("Scraping tidak menghasilkan transaksi (0 data). Mengaktifkan fallback OCR otomatis...", "WARNING")
@@ -467,7 +523,8 @@ def extract_statement(
             pdf_path,
             output_excel_path=excel_path,
             password=password,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            settings=settings,
         )
 
         if ocr_res and isinstance(ocr_res, int) and ocr_res > 0:

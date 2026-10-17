@@ -25,7 +25,7 @@ def is_new_transaction(row):
         
     return False
 
-def process_ocbc_final(pdf_path, output_excel_path, password=None):
+def process_ocbc_final(pdf_path, output_excel_path, password=None, settings=None):
     import pdfplumber
     import pandas as pd
     print(f"Membaca file: {pdf_path}...")
@@ -110,17 +110,8 @@ def process_ocbc_final(pdf_path, output_excel_path, password=None):
     else:
         print("[Warning] Kolom Debit/Kredit tidak ditemukan otomatis. Penukaran dilewati.")
 
-    try:
-        df.to_excel(output_excel_path, index=False)
-        print(f"Selesai! File tersimpan: {output_excel_path}")
-        return len(merged_data)
-    except PermissionError:
-        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
-        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
-        return 0
-    except Exception as e:
-        print(f"Gagal menyimpan file Excel: {e}")
-        return 0
+    from exporter import export_dataframe_to_excel
+    return export_dataframe_to_excel(df, output_excel_path, settings=settings)
 
 # Standardized parser alias
 parse = process_ocbc_final

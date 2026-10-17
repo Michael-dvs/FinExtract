@@ -1,7 +1,7 @@
 import re
 from typing import Any, Optional
 
-def parse(pdf_path: str, output_excel_path: str, password: str | None = None) -> int:
+def parse(pdf_path: str, output_excel_path: str, password: str | None = None, settings: Any = None) -> int:
     """Ekstraksi mutasi Bank Mandiri dari PDF ke file Excel."""
     import pdfplumber
     import pandas as pd
@@ -52,26 +52,24 @@ def parse(pdf_path: str, output_excel_path: str, password: str | None = None) ->
     else:
         print("Peringatan: Kolom Debit atau Credit tidak ditemukan secara otomatis.")
 
-    try:
-        df.to_excel(output_excel_path, index=False)
-        print(f"Selesai! Data tersimpan di: {output_excel_path}")
-        return len(all_data)
-    except PermissionError:
-        print(f"ERROR: Gagal menyimpan file ke '{output_excel_path}'.")
-        print("SOLUSI: Pastikan file Excel tersebut TIDAK SEDANG DIBUKA. Tutup file Excel lalu coba lagi.")
-        return 0
-    except Exception as e:
-        print(f"Gagal menyimpan file Excel: {e}")
-        return 0
+    from exporter import export_dataframe_to_excel
+    return export_dataframe_to_excel(df, output_excel_path, settings=settings)
 
 # Backward compatibility alias
 process_bank_statement = parse
 
 
-def parse_ocr(pdf_path: str, output_excel_path: str, password: str | None = None, progress_callback: Any = None) -> int:
+def parse_ocr(
+    pdf_path: str,
+    output_excel_path: str,
+    password: str | None = None,
+    progress_callback: Any = None,
+    settings: Any = None
+) -> int:
     """Ekstraksi mutasi Mandiri via OCR lokal (menggunakan parser Livin/Mandiri OCR)."""
     from parser.Livin import parse_ocr as livin_parse_ocr
-    return livin_parse_ocr(pdf_path, output_excel_path, password=password, progress_callback=progress_callback)
+    return livin_parse_ocr(pdf_path, output_excel_path, password=password, progress_callback=progress_callback, settings=settings)
+
 
 
 if __name__ == "__main__":
